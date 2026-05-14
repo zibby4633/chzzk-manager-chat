@@ -32,7 +32,9 @@
     stickToBottom: true,
     resizing: false,
     resizeStartY: 0,
-    resizeStartHeight: 0
+    resizeStartHeight: 0,
+    locationKey: "",
+    locationTimer: null
   };
 
   injectPageHook();
@@ -45,7 +47,9 @@
     Object.assign(state, settings);
 
     await waitForBody();
+    state.locationKey = getLocationKey();
     mountPanel();
+    startLocationWatch();
     startDockSync();
     flushPendingChats();
 
@@ -104,6 +108,11 @@
   function handlePageMessage(event) {
     if (event.source !== window) return;
     if (event.data?.source !== "CHZZK_MANAGER_CHAT_WS") return;
+
+    if (event.data.type === "socket-open") {
+      resetChatHistory();
+      return;
+    }
 
     const chat = event.data.chat;
     if (!chat || !chat.message) return;
@@ -401,6 +410,23 @@
     state.dockTimer = window.setInterval(tryDockPanel, 2000);
   }
 
+  function startLocationWatch() {
+    if (state.locationTimer) window.clearInterval(state.locationTimer);
+
+    state.locationTimer = window.setInterval(() => {
+      const nextKey = getLocationKey();
+      if (nextKey === state.locationKey) return;
+
+      state.locationKey = nextKey;
+      resetChatHistory();
+      tryDockPanel();
+    }, 500);
+  }
+
+  function getLocationKey() {
+    return `${location.origin}${location.pathname}${location.search}`;
+  }
+
   function tryDockPanel() {
     if (!state.root) return;
 
@@ -597,6 +623,15 @@
     } else if (removedHeight > 0) {
       state.list.scrollTop = Math.max(0, previousScrollTop - removedHeight);
     }
+  }
+
+  function resetChatHistory() {
+    state.recentKeys.clear();
+    state.pendingChats = [];
+    state.stickToBottom = true;
+
+    if (!state.list) return;
+    state.list.innerHTML = `<div class="empty">매니저 채팅을 기다리는 중</div>`;
   }
 
   function trimRecentKeys(now) {

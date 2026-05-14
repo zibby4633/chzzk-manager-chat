@@ -17,6 +17,14 @@
         super(url, protocols);
       }
 
+      if (looksLikeChatSocket(url)) {
+        window.postMessage({
+          source: "CHZZK_MANAGER_CHAT_WS",
+          type: "socket-open",
+          url: String(url || "")
+        }, "*");
+      }
+
       this.addEventListener("message", (event) => {
         readPayload(event.data).then(inspectPayload).catch(() => {});
       });
@@ -25,6 +33,10 @@
 
   Object.setPrototypeOf(HookedWebSocket, NativeWebSocket);
   window.WebSocket = HookedWebSocket;
+
+  function looksLikeChatSocket(url) {
+    return /chat|ntalk|chzzk|game\.naver/i.test(String(url || ""));
+  }
 
   async function readPayload(data) {
     if (typeof data === "string") return data;
